@@ -34,6 +34,16 @@ export default function RegistrationForm({ config }: RegistrationFormProps) {
     }
   }, []);
 
+  // Helper to ensure LinkedIn URL has protocol scheme
+  const formatLinkedinUrl = (rawUrl: string): string => {
+    let trimmed = rawUrl.trim();
+    if (!trimmed) return "";
+    if (!/^https?:\/\//i.test(trimmed)) {
+      trimmed = `https://${trimmed}`;
+    }
+    return trimmed;
+  };
+
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
     if (!fullName.trim()) newErrors.fullName = "Full name is required";
@@ -46,8 +56,11 @@ export default function RegistrationForm({ config }: RegistrationFormProps) {
     if (!role) newErrors.role = "Please select an application role";
     if (!linkedinUrl.trim()) {
       newErrors.linkedinUrl = "LinkedIn URL is required";
-    } else if (!linkedinUrl.includes("linkedin.com/")) {
-      newErrors.linkedinUrl = "Please enter a valid LinkedIn URL";
+    } else {
+      const formatted = formatLinkedinUrl(linkedinUrl);
+      if (!formatted.toLowerCase().includes("linkedin.com/")) {
+        newErrors.linkedinUrl = "Please enter a valid LinkedIn URL (e.g. linkedin.com/in/username)";
+      }
     }
     if (!acceptTerms) {
       newErrors.acceptTerms = "You must accept the terms and conditions to register";
@@ -65,6 +78,8 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   setIsSubmitting(true);
 
+  const finalLinkedinUrl = formatLinkedinUrl(linkedinUrl);
+
   try {
     // Send the user's details to the n8n webhook as requested
     try {
@@ -78,12 +93,12 @@ const handleSubmit = async (e: React.FormEvent) => {
           email: email.trim(),
           phone: phone.trim(),
           role: role,
-          linkedinUrl: linkedinUrl.trim(),
+          linkedinUrl: finalLinkedinUrl,
           "Full Name": fullName.trim(),
           "Email": email.trim(),
           "Phone": phone.trim(),
           "Application Role": role,
-          "LinkedIn URL": linkedinUrl.trim(),
+          "LinkedIn URL": finalLinkedinUrl,
         }),
       });
     } catch (webhookErr) {
@@ -101,7 +116,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         email: email.trim(),
         phone: phone.trim(),
         role: role,
-        linkedinUrl: linkedinUrl.trim(),
+        linkedinUrl: finalLinkedinUrl,
       }),
     });
 
@@ -347,11 +362,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </label>
                 <input
                   id="linkedin"
-                  type="url"
+                  type="text"
                   required
                   value={linkedinUrl}
                   onChange={(e) => setLinkedinUrl(e.target.value)}
-                  placeholder="https://www.linkedin.com/in/username"
+                  placeholder="https://www.linkedin.com/in/username or linkedin.com/in/username"
                   className={`w-full bg-slate-50/50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 transition-all ${
                     errors.linkedinUrl ? "border-rose-400 focus:ring-rose-200" : "border-slate-200 focus:ring-lime-100 focus:border-brand-primary"
                   }`}
