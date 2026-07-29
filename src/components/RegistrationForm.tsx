@@ -221,7 +221,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             )
           ) : (
             /* Registration Form Fields */
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form noValidate onSubmit={handleSubmit} className="space-y-6">
               
               {submitError && (
                 <div className="bg-rose-50 border border-rose-100 text-rose-800 text-xs rounded-xl p-4">
