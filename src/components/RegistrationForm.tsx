@@ -96,10 +96,16 @@ const handleSubmit = async (e: React.FormEvent) => {
       }),
     });
 
-    const resData = await response.json().catch(() => ({ success: false, message: "Invalid server response format" }));
+    const responseText = await response.text();
+    let resData: any = {};
+    try {
+      resData = JSON.parse(responseText);
+    } catch (e) {
+      throw new Error(`Server returned unexpected response (HTTP ${response.status})`);
+    }
 
     if (!response.ok || !resData.success) {
-      throw new Error(resData.message || "Backend registration failed");
+      throw new Error(resData.message || `Registration request failed (HTTP ${response.status})`);
     }
 
     const newRegistration: Registration = {
