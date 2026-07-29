@@ -81,31 +81,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   const finalLinkedinUrl = formatLinkedinUrl(linkedinUrl);
 
   try {
-    // Send the user's details to the n8n webhook as requested
-    try {
-      await fetch("https://dev.automation.emigr8visa.com/webhook/hackathon-form", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: fullName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          role: role,
-          linkedinUrl: finalLinkedinUrl,
-          "Full Name": fullName.trim(),
-          "Email": email.trim(),
-          "Phone": phone.trim(),
-          "Application Role": role,
-          "LinkedIn URL": finalLinkedinUrl,
-        }),
-      });
-    } catch (webhookErr) {
-      console.error("Failed to send registration details to webhook:", webhookErr);
-    }
-
-    // Send to server API to save in Firestore and dispatch welcome email in one atomic action
+    // Send to server API (which saves registration, forwards to n8n webhook, and dispatches email)
     const response = await fetch("/api/register", {
       method: "POST",
       headers: {
@@ -120,7 +96,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       }),
     });
 
-    const resData = await response.json();
+    const resData = await response.json().catch(() => ({ success: false, message: "Invalid server response format" }));
 
     if (!response.ok || !resData.success) {
       throw new Error(resData.message || "Backend registration failed");

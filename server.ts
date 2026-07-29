@@ -152,6 +152,30 @@ async function startServer() {
       registrations.push({ id: docId, ...regData });
       fs.writeFileSync(REGISTRATIONS_FILE_PATH, JSON.stringify(registrations, null, 2), "utf-8");
 
+      // Server-side forwarding to n8n webhook (prevents browser CORS / Safari DOMExceptions)
+      try {
+        await fetch("https://dev.automation.emigr8visa.com/webhook/hackathon-form", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fullName: regData.fullName,
+            email: regData.email,
+            phone: regData.phone,
+            role: regData.role,
+            linkedinUrl: regData.linkedinUrl,
+            "Full Name": regData.fullName,
+            "Email": regData.email,
+            "Phone": regData.phone,
+            "Application Role": regData.role,
+            "LinkedIn URL": regData.linkedinUrl,
+          }),
+        });
+      } catch (webhookErr) {
+        console.error("Server n8n webhook forwarding notice (non-fatal):", webhookErr);
+      }
+
       // Custom static onboarding welcome template
       const welcomeSubject = `Welcome to the Bincom Hackathon! - ${regData.role}`;
       const welcomeTemplate = `<h2>Hello {{name}},</h2>
