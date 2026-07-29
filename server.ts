@@ -121,8 +121,9 @@ async function startServer() {
 
   // API: User Registration
   app.post("/api/register", async (req, res) => {
+    res.setHeader("Content-Type", "application/json");
     try {
-      const { fullName, email, phone, role, linkedinUrl } = req.body;
+      const { fullName, email, phone, role, linkedinUrl } = req.body || {};
       
       if (!fullName || !email || !phone || !role) {
         return res.status(400).json({
@@ -152,33 +153,38 @@ async function startServer() {
       registrations.push({ id: docId, ...regData });
       fs.writeFileSync(REGISTRATIONS_FILE_PATH, JSON.stringify(registrations, null, 2), "utf-8");
 
-      // Server-side forwarding to n8n webhook (prevents browser CORS / Safari DOMExceptions)
-      try {
-        await fetch("https://dev.automation.emigr8visa.com/webhook/hackathon-form", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fullName: regData.fullName,
-            email: regData.email,
-            phone: regData.phone,
-            role: regData.role,
-            linkedinUrl: regData.linkedinUrl,
-            "Full Name": regData.fullName,
-            "Email": regData.email,
-            "Phone": regData.phone,
-            "Application Role": regData.role,
-            "LinkedIn URL": regData.linkedinUrl,
-          }),
-        });
-      } catch (webhookErr) {
-        console.error("Server n8n webhook forwarding notice (non-fatal):", webhookErr);
-      }
+      // Non-blocking background trigger for n8n webhook (prevents hanging / 504 timeouts)
+      (async () => {
+        try {
+          await fetch("https://dev.automation.emigr8visa.com/webhook/hackathon-form", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fullName: regData.fullName,
+              email: regData.email,
+              phone: regData.phone,
+              role: regData.role,
+              linkedinUrl: regData.linkedinUrl,
+              "Full Name": regData.fullName,
+              "Email": regData.email,
+              "Phone": regData.phone,
+              "Application Role": regData.role,
+              "LinkedIn URL": regData.linkedinUrl,
+            }),
+            signal: AbortSignal.timeout(5000),
+          });
+        } catch (webhookErr) {
+          console.error("Server n8n webhook background notice:", webhookErr);
+        }
+      })();
 
-      // Custom static onboarding welcome template
-      const welcomeSubject = `Welcome to the Bincom Hackathon! - ${regData.role}`;
-      const welcomeTemplate = `<h2>Hello {{name}},</h2>
+      // Non-blocking background trigger for onboarding welcome email via Resend
+      (async () => {
+        try {
+          const welcomeSubject = `Welcome to the Bincom Hackathon! - ${regData.role}`;
+          const welcomeTemplate = `<h2>Hello {{name}},</h2>
 <p>Thank you for registering for the <strong>Bincom Hackathon</strong> as a <strong>{{role}}</strong>!</p>
 <p>Here are your essential onboarding links:</p>
 <ul>
@@ -189,35 +195,36 @@ async function startServer() {
 <p>The hackathon starts on <strong>{{start_date}}</strong> and ends on <strong>{{end_date}}</strong>.</p>
 <p>Get ready to hack!</p>`;
 
-      const personalizedSubject = replaceEmailPlaceholders(welcomeSubject, {
-        fullName: regData.fullName,
-        role: regData.role,
-        linkedinUrl: regData.linkedinUrl
-      });
+          const personalizedSubject = replaceEmailPlaceholders(welcomeSubject, {
+            fullName: regData.fullName,
+            role: regData.role,
+            linkedinUrl: regData.linkedinUrl
+          });
 
-      const personalizedBody = replaceEmailPlaceholders(welcomeTemplate, {
-        fullName: regData.fullName,
-        role: regData.role,
-        linkedinUrl: regData.linkedinUrl
-      });
+          const personalizedBody = replaceEmailPlaceholders(welcomeTemplate, {
+            fullName: regData.fullName,
+            role: regData.role,
+            linkedinUrl: regData.linkedinUrl
+          });
 
-      // Trigger transaction onboarding email via Resend
-      const emailResult = await sendEmailViaResend(regData.email, personalizedSubject, personalizedBody);
+          await sendEmailViaResend(regData.email, personalizedSubject, personalizedBody);
+        } catch (emailErr) {
+          console.error("Server email background notice:", emailErr);
+        }
+      })();
 
-      res.json({
+      return res.status(200).json({
         success: true,
         message: "Registration recorded successfully",
         registration: {
           id: docId,
           ...regData,
           registeredAt: new Date(regData.registeredAt).toLocaleString()
-        },
-        emailSent: emailResult.success,
-        emailError: emailResult.success ? undefined : emailResult.error
+        }
       });
     } catch (error: any) {
       console.error("Registration route error:", error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: error.message || "Failed to process registration",
       });
