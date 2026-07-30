@@ -27,9 +27,13 @@ export default function RegistrationForm({ config }: RegistrationFormProps) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as Registration;
-        setTicket(parsed);
+        if (parsed && parsed.id && parsed.fullName) {
+          setTicket(parsed);
+        } else {
+          localStorage.removeItem("bincom_hackathon_registration");
+        }
       } catch (e) {
-        console.error("Failed to parse ticket", e);
+        localStorage.removeItem("bincom_hackathon_registration");
       }
     }
   }, []);
