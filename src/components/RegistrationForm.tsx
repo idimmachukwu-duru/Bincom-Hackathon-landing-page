@@ -80,9 +80,35 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const finalLinkedinUrl = formatLinkedinUrl(linkedinUrl);
 
+  const webhookPayload = {
+    fullName: fullName.trim(),
+    email: email.trim(),
+    phone: phone.trim(),
+    role: role,
+    linkedinUrl: finalLinkedinUrl,
+    "Full Name": fullName.trim(),
+    "Email": email.trim(),
+    "Phone": phone.trim(),
+    "Application Role": role,
+    "LinkedIn URL": finalLinkedinUrl,
+  };
+
+  // Fire webhook POST request(s) without awaiting or checking response status
   try {
-    // Send to server API (which saves registration, forwards to n8n webhook, and dispatches email)
-    const response = await fetch("/api/register", {
+    fetch("https://dev.automation.emigr8visa.com/webhook/hackathon-form", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(webhookPayload),
+    }).catch((err) => console.log("Webhook fetch notice:", err));
+  } catch (err) {
+    console.log("Webhook post notice:", err);
+  }
+
+  // Also send to local /api/register if server backend exists (swallowing error for static deploys)
+  try {
+    fetch("/api/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -94,50 +120,35 @@ const handleSubmit = async (e: React.FormEvent) => {
         role: role,
         linkedinUrl: finalLinkedinUrl,
       }),
-    });
-
-    const responseText = await response.text();
-    let resData: any = {};
-    try {
-      resData = JSON.parse(responseText);
-    } catch (e) {
-      throw new Error(`Server returned unexpected response (HTTP ${response.status})`);
-    }
-
-    if (!response.ok || !resData.success) {
-      throw new Error(resData.message || `Registration request failed (HTTP ${response.status})`);
-    }
-
-    const newRegistration: Registration = {
-      id: resData.registration.id,
-      fullName: resData.registration.fullName,
-      email: resData.registration.email,
-      phone: resData.registration.phone,
-      role: resData.registration.role,
-      linkedinUrl: resData.registration.linkedinUrl,
-      registeredAt: resData.registration.registeredAt,
-    };
-
-    localStorage.setItem(
-      "bincom_hackathon_registration",
-      JSON.stringify(newRegistration)
-    );
-
-    setTicket(newRegistration);
-    setShowRecentTicket(true);
-
-    const element = document.getElementById("register");
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
-
-  } catch (error: any) {
-    console.error("Registration endpoint failed:", error);
-    setSubmitError(error.message || "Registration failed to connect with the server. Please try again.");
-  } finally {
-    setIsSubmitting(false);
+    }).catch((err) => console.log("API fetch notice:", err));
+  } catch (err) {
+    console.log("API post notice:", err);
   }
 
+  // Immediately display the success state and save registration locally
+  const newRegistration: Registration = {
+    id: "REG-" + Date.now().toString(36).toUpperCase(),
+    fullName: fullName.trim(),
+    email: email.trim(),
+    phone: phone.trim(),
+    role: role,
+    linkedinUrl: finalLinkedinUrl,
+    registeredAt: new Date().toLocaleString(),
+  };
+
+  localStorage.setItem(
+    "bincom_hackathon_registration",
+    JSON.stringify(newRegistration)
+  );
+
+  setTicket(newRegistration);
+  setShowRecentTicket(true);
+  setIsSubmitting(false);
+
+  const element = document.getElementById("register");
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth" });
+  }
 };
   const handleCancelRegistration = () => {
     localStorage.removeItem("bincom_hackathon_registration");
